@@ -7,12 +7,12 @@ metadata:
   name: mikkemus-web
   namespace: mikkemus
 spec:
-  image: "<ditt-registry-image>:latest"
+  image: "ghcr.io/ahmedabdulahi/mikkemus-web:latest"
   port: 8080
   replicas: 1
 
   ingresses:
-    - mikkemus.51-158-58-170.nip.io # bytt til et ekte hostnavn når dere har et
+    - mikkemusss.51-158-58-170.nip.io # bytt til et ekte hostnavn når dere har et
 
   liveness:
     path: /
@@ -22,12 +22,24 @@ spec:
     path: /
     port: 8080
 
-  env:
-    - name: DATABASE_URL
-      valueFrom:
-        secretKeyRef:
-          name: mikkemus-db
-          key: DATABASE_URL
+  envFrom:
+    - secret: mikkemus-db
+
+
+  # Uten denne blokkerer skiperator sin NetworkPolicy/AuthorizationPolicy all
+  # utgående trafikk til ting som ikke er en annen skiperator-Application.
+  # Databasen er en ekstern Scaleway-tjeneste (nås via privat VPC-IP), så den
+  # må whitelistes eksplisitt her. IP-en er samme som i mikkemus-db-secreten
+  # (terraform output -raw mikkemus_db_connection_string i eurocloud-repoet).
+  accessPolicy:
+    outbound:
+      external:
+        - host: "172.16.0.3"
+          ip: "172.16.0.3"
+          ports:
+            - name: postgres
+              protocol: TCP
+              port: 5432
 
   resources:
     requests:

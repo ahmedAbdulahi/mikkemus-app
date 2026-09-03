@@ -11,9 +11,9 @@ RUN npm ci
 # ---- builder: generer Prisma-klient og bygg Next.js ----
 FROM node:22-alpine AS builder
 WORKDIR /app
+# npm workspaces "hoister" avhengigheter til rot-node_modules – det finnes
+# ingen separate node_modules-mapper per workspace å kopiere.
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/database/node_modules ./packages/database/node_modules
 COPY . .
 
 # DATABASE_URL trengs ikke for å generere klienten, kun for faktiske spørringer,
@@ -21,6 +21,24 @@ COPY . .
 ENV DATABASE_URL="postgresql://placeholder:placeholder@placeholder:5432/placeholder"
 RUN npm run db:generate
 RUN npm run build -w @mikkemus/web
+
+# ---- migrator: eget lite image kun til å kjøre `prisma db push` som en
+# engangsjobb (SKIPJob) mot databasen. Produksjons-imaget under ("runner")
+# har med hensikt IKKE Prisma CLI-en eller node_modules – bare det Next.js
+# trenger for å kjøre. Bygges separat med `docker build --target migrator`.
+FROM node:22-alpine AS migrator
+WORKDIR /app
+
+# Samme UID-krav som runner-imaget under.
+RUN addgroup -g 150 skiperator && adduser -D -u 150 -G skiperator skiperator
+
+COPY --from=deps --chown=150:150 /app/node_modules ./node_modules
+COPY --chown=150:150 package.json package-lock.json ./
+COPY --chown=150:150 packages/database ./packages/database
+
+USER 150
+
+CMD ["npx", "prisma", "db", "push", "--schema=packages/database/prisma/schema.prisma", "--skip-generate"]
 
 # ---- runner: minimalt runtime-image ----
 FROM node:22-alpine AS runner
