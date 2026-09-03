@@ -1,0 +1,37 @@
+# Eksempel på skiperator Application-manifest for mikkemus-app.
+# Bytt ut <ditt-registry-image> og ingress-hostnavnet før du bruker denne.
+# Se eurocloud-repoet for hvordan dere setter opp registry/bygg av image.
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: mikkemus-web
+  namespace: mikkemus
+spec:
+  image: "<ditt-registry-image>:latest"
+  port: 8080
+  replicas: 1
+
+  ingresses:
+    - mikkemus.51-158-58-170.nip.io # bytt til et ekte hostnavn når dere har et
+
+  liveness:
+    path: /
+    port: 8080
+
+  readiness:
+    path: /
+    port: 8080
+
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: mikkemus-db
+          key: DATABASE_URL
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128M
+    limits:
+      memory: 512M

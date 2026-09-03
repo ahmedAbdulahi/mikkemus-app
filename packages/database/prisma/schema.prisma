@@ -1,0 +1,22 @@
+// Prisma schema for mikkemus-app.
+// Databasen er en PostgreSQL-instans i Scaleway (Managed Database).
+// DATABASE_URL settes via miljøvariabel, se .env.example i rot-mappen.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Et registrert navn, f.eks. en besøkende som har skrevet seg inn.
+model Navn {
+  id         String   @id @default(cuid())
+  navn       String
+  opprettet  DateTime @default(now())
+
+  @@map("navn")
+}

@@ -1,0 +1,19 @@
+{
+  "name": "mikkemus-app",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @mikkemus/web",
+    "build": "npm run build -w @mikkemus/database && npm run build -w @mikkemus/web",
+    "start": "npm run start -w @mikkemus/web",
+    "lint": "npm run lint -w @mikkemus/web",
+    "db:generate": "npm run generate -w @mikkemus/database",
+    "db:migrate:deploy": "npm run migrate:deploy -w @mikkemus/database",
+    "db:migrate:dev": "npm run migrate:dev -w @mikkemus/database",
+    "db:studio": "npm run studio -w @mikkemus/database"
+  }
+}
