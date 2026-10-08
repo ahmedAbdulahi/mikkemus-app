@@ -69,12 +69,14 @@ export default function Home() {
         </button>
       </form>
 
-      <a
-        href="/navn"
-        className="inline-block mt-6 text-mikke-red font-medium hover:underline"
-      >
-        Se hvem som har vært innom →
-      </a>
+      <div className="flex justify-between mt-6">
+        <a href="/navn" className="text-mikke-red font-medium hover:underline">
+          Se hvem som har vært innom →
+        </a>
+        <a href="/status" className="text-mikke-red font-medium hover:underline">
+          Plattformstatus
+        </a>
+      </div>
     </div>
   );
 }
