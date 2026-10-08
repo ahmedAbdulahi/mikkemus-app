@@ -24,7 +24,19 @@ spec:
 
   envFrom:
     - secret: mikkemus-db
+    # Blob storage: Secret med BLOB_STORAGE_URL, BLOB_STORAGE_USERNAME og
+    # BLOB_STORAGE_PASSWORD fra plattformen. Podden starter ikke hvis en
+    # secret her mangler, så la linja stå kommentert ut til den finnes.
+    # - secret: mikkemus-blob
 
+  # Block storage: et PersistentVolumeClaim montert inn som en mappe.
+  # BLOCK_STORAGE_PATH må peke på samme sti som mountPath.
+  # filesFrom:
+  #   - mountPath: /data
+  #     persistentVolumeClaim: mikkemus-data
+  # env:
+  #   - name: BLOCK_STORAGE_PATH
+  #     value: /data
 
   # Uten denne blokkerer skiperator sin NetworkPolicy/AuthorizationPolicy all
   # utgående trafikk til ting som ikke er en annen skiperator-Application.
@@ -40,6 +52,8 @@ spec:
             - name: postgres
               protocol: TCP
               port: 5432
+        # Blob storage går over HTTPS (port 443 er standard når ports utelates).
+        # - host: s3.fr-par.scw.cloud
 
   resources:
     requests:
