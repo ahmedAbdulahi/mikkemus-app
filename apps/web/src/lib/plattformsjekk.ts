@@ -77,28 +77,25 @@ async function sjekkDatabase(tjeneste: string): Promise<Sjekk> {
   ]);
 }
 
-// Blob storage er S3-kompatibel objektlagring (f.eks. Scaleway Object Storage).
-// Plattformen gir en URL, et brukernavn (access key) og et passord (secret key).
-// Brukernavn/passord kan også ligge i selve URL-en, og bøttenavnet kan ligge i
-// stien: https://<brukernavn>:<passord>@s3.fr-par.scw.cloud/<bøtte>
+// Blob storage er S3-kompatibel objektlagring (Scaleway Object Storage).
+// Plattformen gir de samme miljøvariablene som AWS-SDK-ene leser av seg selv
+// (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, AWS_ENDPOINT_URL_S3),
+// pluss bøttenavnet i S3_BUCKET.
 async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
-  if (!process.env.BLOB_STORAGE_URL) {
-    return utenSteg(tjeneste, "ikke-konfigurert", "BLOB_STORAGE_URL er ikke satt.");
+  if (!process.env.AWS_ENDPOINT_URL_S3) {
+    return utenSteg(tjeneste, "ikke-konfigurert", "AWS_ENDPOINT_URL_S3 er ikke satt.");
   }
-  const url = parseUrl(process.env.BLOB_STORAGE_URL);
+  const url = parseUrl(process.env.AWS_ENDPOINT_URL_S3);
   if (!url) {
-    return utenSteg(tjeneste, "feil", "BLOB_STORAGE_URL er ikke en gyldig URL.");
+    return utenSteg(tjeneste, "feil", "AWS_ENDPOINT_URL_S3 er ikke en gyldig URL.");
   }
 
-  const brukernavn =
-    process.env.BLOB_STORAGE_USERNAME || decodeURIComponent(url.username);
-  const passord =
-    process.env.BLOB_STORAGE_PASSWORD || decodeURIComponent(url.password);
-  const bøtte =
-    process.env.BLOB_STORAGE_BUCKET || url.pathname.split("/").find(Boolean) || "";
+  const accessKey = process.env.AWS_ACCESS_KEY_ID || "";
+  const secretKey = process.env.AWS_SECRET_ACCESS_KEY || "";
+  const bøtte = process.env.S3_BUCKET || "";
   // Regionen inngår i signaturen. S3-vertsnavn er som regel s3.<region>.<domene>.
   const region =
-    process.env.BLOB_STORAGE_REGION ||
+    process.env.AWS_REGION ||
     /^s3\.([a-z0-9-]+)\./.exec(url.hostname)?.[1] ||
     "us-east-1";
 
@@ -106,14 +103,14 @@ async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
     `Endepunkt: ${url.origin}`,
     `Bøtte: ${bøtte || "mangler"}`,
     `Region: ${region}`,
-    `Brukernavn: ${masker(brukernavn)}`,
-    `Passord: ${passord ? "satt" : "mangler"}`,
+    `Access key: ${masker(accessKey)}`,
+    `Secret key: ${secretKey ? "satt" : "mangler"}`,
   ];
 
   const mangler = [
-    !brukernavn && "brukernavn (BLOB_STORAGE_USERNAME)",
-    !passord && "passord (BLOB_STORAGE_PASSWORD)",
-    !bøtte && "bøtte (BLOB_STORAGE_BUCKET eller i stien til URL-en)",
+    !accessKey && "access key (AWS_ACCESS_KEY_ID)",
+    !secretKey && "secret key (AWS_SECRET_ACCESS_KEY)",
+    !bøtte && "bøtte (S3_BUCKET)",
   ].filter(Boolean);
   if (mangler.length > 0) {
     return utenSteg(tjeneste, "feil", `Mangler ${mangler.join(", ")}.`, info);
@@ -123,7 +120,7 @@ async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
     endpoint: url.origin,
     region,
     forcePathStyle: true,
-    credentials: { accessKeyId: brukernavn, secretAccessKey: passord },
+    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
     // Vi vil se den faktiske feilen med en gang, ikke etter flere nye forsøk.
     maxAttempts: 1,
     // Nyere versjoner av SDK-en sender CRC32-sjekksummer som standard, noe
@@ -271,7 +268,7 @@ function parseUrl(verdi: string): URL | null {
   }
 }
 
-// Viser bare starten av brukernavnet, nok til å se at plattformen har satt det
+// Viser bare starten av brukernavnet/access key-en, nok til å se at plattformen har satt det
 // uten å legge hele nøkkelen ut på en offentlig side.
 function masker(verdi: string): string {
   return verdi ? `${verdi.slice(0, 4)}…` : "mangler";

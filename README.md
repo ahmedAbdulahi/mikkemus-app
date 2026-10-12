@@ -94,14 +94,13 @@ sekunder, så en blokkert tilkobling henger ikke.
 | Ressurs | Miljøvariabler | Hva som testes |
 | --- | --- | --- |
 | Database | `DATABASE_URL` | Kobler til og kjører `SELECT 1` |
-| Blob storage (S3) | `BLOB_STORAGE_URL`, `BLOB_STORAGE_USERNAME`, `BLOB_STORAGE_PASSWORD` (+ valgfritt `BLOB_STORAGE_BUCKET`, `BLOB_STORAGE_REGION`) | Når bøtta, skriver, leser og sletter en testfil |
+| Blob storage (S3) | `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET` (+ valgfritt `AWS_REGION`) | Når bøtta, skriver, leser og sletter en testfil |
 | Block storage | `BLOCK_STORAGE_PATH` | Finner mappa (og ledig plass), skriver, leser og sletter en testfil |
 
-Blob storage forventer en S3-kompatibel tjeneste (f.eks. Scaleway Object
-Storage), der brukernavn er access key og passord er secret key. Bøttenavnet
-kan stå i stien til URL-en (`https://s3.fr-par.scw.cloud/<bøtte>`), og
-brukernavn/passord kan også ligge i selve URL-en. Se `.env.example`.
+Blob storage forventer en S3-kompatibel tjeneste (Scaleway Object Storage).
+Plattformen lager bøtta og legger nøklene i secreten `<namespace>-blob` med
+navnene over. `AWS_*` er de AWS-SDK-ene leser av seg selv. Se `.env.example`.
 
 Block storage kommer ikke som en URL, men som et volum montert inn i
 containeren. Se de utkommenterte eksemplene i `k8s/application.yaml` for
-hvordan secret, volum og utgående trafikk til S3 kobles på.
+hvordan volumet kobles på.
