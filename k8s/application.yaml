@@ -7,7 +7,7 @@ metadata:
   name: mikkemus-web
   namespace: mikkemus
 spec:
-  image: "ghcr.io/ahmedabdulahi/mikkemus-web:latest"
+  image: "ghcr.io/madshermansen/mikkemus-web:latest"
   port: 8080
   replicas: 1
 

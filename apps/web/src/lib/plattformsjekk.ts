@@ -6,9 +6,9 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
-  S3Client,
 } from "@aws-sdk/client-s3";
 import { prisma } from "@mikkemus/database";
+import { finnRegion, lagS3Klient } from "@/lib/blob";
 
 // Sjekker om ressursene plattformen skal gi appen (database, blob storage og
 // block storage) faktisk er satt opp og fungerer. Ingen av sjekkene kaster –
@@ -77,10 +77,8 @@ async function sjekkDatabase(tjeneste: string): Promise<Sjekk> {
   ]);
 }
 
-// Blob storage er S3-kompatibel objektlagring (Scaleway Object Storage).
-// Plattformen gir de samme miljøvariablene som AWS-SDK-ene leser av seg selv
-// (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, AWS_ENDPOINT_URL_S3),
-// pluss bøttenavnet i S3_BUCKET.
+// Se lib/blob.ts for hvilke miljøvariabler plattformen gir. Her sjekkes de én
+// og én, så siden kan si nøyaktig hva som mangler.
 async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
   if (!process.env.AWS_ENDPOINT_URL_S3) {
     return utenSteg(tjeneste, "ikke-konfigurert", "AWS_ENDPOINT_URL_S3 er ikke satt.");
@@ -93,11 +91,7 @@ async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
   const accessKey = process.env.AWS_ACCESS_KEY_ID || "";
   const secretKey = process.env.AWS_SECRET_ACCESS_KEY || "";
   const bøtte = process.env.S3_BUCKET || "";
-  // Regionen inngår i signaturen. S3-vertsnavn er som regel s3.<region>.<domene>.
-  const region =
-    process.env.AWS_REGION ||
-    /^s3\.([a-z0-9-]+)\./.exec(url.hostname)?.[1] ||
-    "us-east-1";
+  const region = finnRegion(url);
 
   const info = [
     `Endepunkt: ${url.origin}`,
@@ -116,18 +110,11 @@ async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
     return utenSteg(tjeneste, "feil", `Mangler ${mangler.join(", ")}.`, info);
   }
 
-  const s3 = new S3Client({
-    endpoint: url.origin,
-    region,
-    forcePathStyle: true,
-    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
+  const s3 = lagS3Klient(
+    { endepunkt: url, region, accessKey, secretKey, bøtte },
     // Vi vil se den faktiske feilen med en gang, ikke etter flere nye forsøk.
-    maxAttempts: 1,
-    // Nyere versjoner av SDK-en sender CRC32-sjekksummer som standard, noe
-    // mange S3-kompatible tjenester ikke støtter.
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-  });
+    { maxAttempts: 1 },
+  );
   const nøkkel = `plattformsjekk/${randomUUID()}.txt`;
   const innhold = lagTestinnhold();
 

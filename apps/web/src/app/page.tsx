@@ -73,6 +73,9 @@ export default function Home() {
         <a href="/navn" className="text-mikke-red font-medium hover:underline">
           Se hvem som har vært innom →
         </a>
+        <a href="/bilder" className="text-mikke-red font-medium hover:underline">
+          Bilder
+        </a>
         <a href="/status" className="text-mikke-red font-medium hover:underline">
           Plattformstatus
         </a>
