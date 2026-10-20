@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@mikkemus/database";
+import { hentSide, lesSidetall, PER_SIDE } from "@/lib/navn";
 
-export async function GET() {
-  const navn = await prisma.navn.findMany({
-    orderBy: { opprettet: "desc" },
-  });
-  return NextResponse.json(navn);
+// Én side om gangen, f.eks. /api/navn?side=2. Å returnere alle radene på én
+// gang får serveren til å gå tom for minne når tabellen er stor.
+export async function GET(request: NextRequest) {
+  const side = await hentSide(lesSidetall(request.nextUrl.searchParams.get("side")));
+  return NextResponse.json({ ...side, perSide: PER_SIDE });
 }
 
 export async function POST(request: NextRequest) {

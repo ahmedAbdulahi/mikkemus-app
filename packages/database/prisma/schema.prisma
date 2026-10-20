@@ -18,5 +18,9 @@ model Navn {
   navn       String
   opprettet  DateTime @default(now())
 
+  // Lista vises sortert på opprettet (nyeste først) med id som tiebreaker, og
+  // grafen grupperer på opprettet. Uten indeksen må hele tabellen sorteres
+  // for hver side.
+  @@index([opprettet, id])
   @@map("navn")
 }
