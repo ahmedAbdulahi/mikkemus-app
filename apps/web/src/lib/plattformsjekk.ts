@@ -6,9 +6,9 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
-  S3Client,
 } from "@aws-sdk/client-s3";
 import { prisma } from "@mikkemus/database";
+import { finnRegion, lagS3Klient } from "@/lib/blob";
 
 // Sjekker om ressursene plattformen skal gi appen (database, blob storage og
 // block storage) faktisk er satt opp og fungerer. Ingen av sjekkene kaster –
@@ -77,60 +77,44 @@ async function sjekkDatabase(tjeneste: string): Promise<Sjekk> {
   ]);
 }
 
-// Blob storage er S3-kompatibel objektlagring (f.eks. Scaleway Object Storage).
-// Plattformen gir en URL, et brukernavn (access key) og et passord (secret key).
-// Brukernavn/passord kan også ligge i selve URL-en, og bøttenavnet kan ligge i
-// stien: https://<brukernavn>:<passord>@s3.fr-par.scw.cloud/<bøtte>
+// Se lib/blob.ts for hvilke miljøvariabler plattformen gir. Her sjekkes de én
+// og én, så siden kan si nøyaktig hva som mangler.
 async function sjekkBlobStorage(tjeneste: string): Promise<Sjekk> {
-  if (!process.env.BLOB_STORAGE_URL) {
-    return utenSteg(tjeneste, "ikke-konfigurert", "BLOB_STORAGE_URL er ikke satt.");
+  if (!process.env.AWS_ENDPOINT_URL_S3) {
+    return utenSteg(tjeneste, "ikke-konfigurert", "AWS_ENDPOINT_URL_S3 er ikke satt.");
   }
-  const url = parseUrl(process.env.BLOB_STORAGE_URL);
+  const url = parseUrl(process.env.AWS_ENDPOINT_URL_S3);
   if (!url) {
-    return utenSteg(tjeneste, "feil", "BLOB_STORAGE_URL er ikke en gyldig URL.");
+    return utenSteg(tjeneste, "feil", "AWS_ENDPOINT_URL_S3 er ikke en gyldig URL.");
   }
 
-  const brukernavn =
-    process.env.BLOB_STORAGE_USERNAME || decodeURIComponent(url.username);
-  const passord =
-    process.env.BLOB_STORAGE_PASSWORD || decodeURIComponent(url.password);
-  const bøtte =
-    process.env.BLOB_STORAGE_BUCKET || url.pathname.split("/").find(Boolean) || "";
-  // Regionen inngår i signaturen. S3-vertsnavn er som regel s3.<region>.<domene>.
-  const region =
-    process.env.BLOB_STORAGE_REGION ||
-    /^s3\.([a-z0-9-]+)\./.exec(url.hostname)?.[1] ||
-    "us-east-1";
+  const accessKey = process.env.AWS_ACCESS_KEY_ID || "";
+  const secretKey = process.env.AWS_SECRET_ACCESS_KEY || "";
+  const bøtte = process.env.S3_BUCKET || "";
+  const region = finnRegion(url);
 
   const info = [
     `Endepunkt: ${url.origin}`,
     `Bøtte: ${bøtte || "mangler"}`,
     `Region: ${region}`,
-    `Brukernavn: ${masker(brukernavn)}`,
-    `Passord: ${passord ? "satt" : "mangler"}`,
+    `Access key: ${masker(accessKey)}`,
+    `Secret key: ${secretKey ? "satt" : "mangler"}`,
   ];
 
   const mangler = [
-    !brukernavn && "brukernavn (BLOB_STORAGE_USERNAME)",
-    !passord && "passord (BLOB_STORAGE_PASSWORD)",
-    !bøtte && "bøtte (BLOB_STORAGE_BUCKET eller i stien til URL-en)",
+    !accessKey && "access key (AWS_ACCESS_KEY_ID)",
+    !secretKey && "secret key (AWS_SECRET_ACCESS_KEY)",
+    !bøtte && "bøtte (S3_BUCKET)",
   ].filter(Boolean);
   if (mangler.length > 0) {
     return utenSteg(tjeneste, "feil", `Mangler ${mangler.join(", ")}.`, info);
   }
 
-  const s3 = new S3Client({
-    endpoint: url.origin,
-    region,
-    forcePathStyle: true,
-    credentials: { accessKeyId: brukernavn, secretAccessKey: passord },
+  const s3 = lagS3Klient(
+    { endepunkt: url, region, accessKey, secretKey, bøtte },
     // Vi vil se den faktiske feilen med en gang, ikke etter flere nye forsøk.
-    maxAttempts: 1,
-    // Nyere versjoner av SDK-en sender CRC32-sjekksummer som standard, noe
-    // mange S3-kompatible tjenester ikke støtter.
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-  });
+    { maxAttempts: 1 },
+  );
   const nøkkel = `plattformsjekk/${randomUUID()}.txt`;
   const innhold = lagTestinnhold();
 
@@ -271,7 +255,7 @@ function parseUrl(verdi: string): URL | null {
   }
 }
 
-// Viser bare starten av brukernavnet, nok til å se at plattformen har satt det
+// Viser bare starten av brukernavnet/access key-en, nok til å se at plattformen har satt det
 // uten å legge hele nøkkelen ut på en offentlig side.
 function masker(verdi: string): string {
   return verdi ? `${verdi.slice(0, 4)}…` : "mangler";

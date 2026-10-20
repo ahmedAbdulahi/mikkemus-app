@@ -7,7 +7,7 @@ metadata:
   name: mikkemus-web
   namespace: mikkemus
 spec:
-  image: "ghcr.io/ahmedabdulahi/mikkemus-web:latest"
+  image: "ghcr.io/madshermansen/mikkemus-web:latest"
   port: 8080
   replicas: 1
 
@@ -24,19 +24,51 @@ spec:
 
   envFrom:
     - secret: mikkemus-db
-    # Blob storage: Secret med BLOB_STORAGE_URL, BLOB_STORAGE_USERNAME og
-    # BLOB_STORAGE_PASSWORD fra plattformen. Podden starter ikke hvis en
-    # secret her mangler, så la linja stå kommentert ut til den finnes.
-    # - secret: mikkemus-blob
+
+  # Blob storage: plattformen lager secreten mikkemus-blob når teamets fil i
+  # eurocloud-repoet har `blob: true`, men bare på Scaleway og bare i miljøer
+  # der det er rullet ut. Med envFrom starter ikke podden der secreten mangler,
+  # så nøklene hentes én og én med optional: true. Mangler secreten, viser
+  # /status bare blob storage som ikke satt opp.
+  env:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: mikkemus-blob
+          key: AWS_ACCESS_KEY_ID
+          optional: true
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: mikkemus-blob
+          key: AWS_SECRET_ACCESS_KEY
+          optional: true
+    - name: AWS_REGION
+      valueFrom:
+        secretKeyRef:
+          name: mikkemus-blob
+          key: AWS_REGION
+          optional: true
+    - name: AWS_ENDPOINT_URL_S3
+      valueFrom:
+        secretKeyRef:
+          name: mikkemus-blob
+          key: AWS_ENDPOINT_URL_S3
+          optional: true
+    - name: S3_BUCKET
+      valueFrom:
+        secretKeyRef:
+          name: mikkemus-blob
+          key: S3_BUCKET
+          optional: true
+    # Block storage: BLOCK_STORAGE_PATH må peke på samme sti som mountPath under.
+    # - name: BLOCK_STORAGE_PATH
+    #   value: /data
 
   # Block storage: et PersistentVolumeClaim montert inn som en mappe.
-  # BLOCK_STORAGE_PATH må peke på samme sti som mountPath.
   # filesFrom:
   #   - mountPath: /data
   #     persistentVolumeClaim: mikkemus-data
-  # env:
-  #   - name: BLOCK_STORAGE_PATH
-  #     value: /data
 
   # Uten denne blokkerer skiperator sin NetworkPolicy/AuthorizationPolicy all
   # utgående trafikk til ting som ikke er en annen skiperator-Application.
@@ -52,8 +84,8 @@ spec:
             - name: postgres
               protocol: TCP
               port: 5432
-        # Blob storage går over HTTPS (port 443 er standard når ports utelates).
-        # - host: s3.fr-par.scw.cloud
+        # Blob storage trenger ingen regel her: plattformen åpner veien til
+        # bøtta selv (en ServiceEntry i namespacet) når den lager secreten.
 
   resources:
     requests:
